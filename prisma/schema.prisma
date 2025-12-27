@@ -1,0 +1,274 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL") // uses connection pooling
+  directUrl = env("POSTGRES_URL_NON_POOLING") // uses direct connection
+}
+
+// ============================================
+// CORE MODELS
+// ============================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  passwordHash String @map("password_hash")
+  displayName String? @map("display_name")
+  timezone  String   @default("UTC")
+  
+  onboardingCompleted Boolean @default(false) @map("onboarding_completed")
+  coachingTone String @default("supportive") @map("coaching_tone") // supportive, direct, playful
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  habits Habit[]
+  habitLogs HabitLog[]
+  streaks Streak[]
+  aiDecisions AIDecision[]
+  burnoutSignals BurnoutSignal[]
+  notifications Notification[]
+  preferences UserPreferences?
+  syncMetadata SyncMetadata[]
+  
+  @@map("users")
+}
+
+model Habit {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Core fields
+  title       String
+  description String?
+  category    String? // health, productivity, social, etc.
+  
+  // Scheduling
+  frequency   String // daily, weekly, custom
+  targetDays  Json?  @map("target_days") // [1,2,3,4,5] for weekdays
+  timeOfDay   String? @map("time_of_day") // morning, afternoon, evening, anytime
+  
+  // Difficulty & Adaptation
+  currentDifficulty Int @default(1) @map("current_difficulty") // 1-10
+  baseDifficulty    Int @default(1) @map("base_difficulty")
+  lockedDifficulty  Boolean @default(false) @map("locked_difficulty")
+  
+  // AI-Generated Plan
+  microSteps   Json? @map("micro_steps") // [{step: "...", duration: "2min"}, ...]
+  aiRationale  String? @map("ai_rationale")
+  
+  // Fallback System
+  fallbackHabitId String? @map("fallback_habit_id")
+  fallbackHabit   Habit?  @relation("FallbackRelation", fields: [fallbackHabitId], references: [id])
+  parentHabits    Habit[] @relation("FallbackRelation")
+  isFallback      Boolean @default(false) @map("is_fallback")
+  
+  // Lifecycle
+  status String @default("active") // active, paused, archived, retired
+  evolutionHistory Json? @map("evolution_history") // [{type: 'split', date: '...', reason: '...'}, ...]
+  
+  // Metadata
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  lastCompletedAt DateTime? @map("last_completed_at")
+  
+  // Relations
+  logs HabitLog[]
+  streak Streak?
+  aiDecisions AIDecision[]
+  burnoutSignals BurnoutSignal[]
+  notifications Notification[]
+  
+  @@index([userId, status])
+  @@map("habits")
+}
+
+model HabitLog {
+  id      String @id @default(uuid())
+  habitId String @map("habit_id")
+  habit   Habit  @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  userId  String @map("user_id")
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Completion Data
+  completedAt          DateTime @map("completed_at")
+  difficultyAtCompletion Int?   @map("difficulty_at_completion")
+  
+  // Context
+  energyLevel   Int?    @map("energy_level") // 1-5
+  timeAvailable Int?    @map("time_available") // minutes
+  dayType       String? @map("day_type") // weekday, weekend, holiday
+  
+  // User Feedback
+  feltTooEasy Boolean? @map("felt_too_easy")
+  feltTooHard Boolean? @map("felt_too_hard")
+  notes       String?
+  
+  // Sync
+  synced           Boolean   @default(false)
+  clientCreatedAt  DateTime? @map("client_created_at")
+  
+  @@index([habitId, completedAt])
+  @@index([userId, completedAt])
+  @@map("habit_logs")
+}
+
+model Streak {
+  id      String @id @default(uuid())
+  habitId String @unique @map("habit_id")
+  habit   Habit  @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  userId  String @map("user_id")
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  currentStreak  Int      @default(0) @map("current_streak")
+  longestStreak  Int      @default(0) @map("longest_streak")
+  lastResetDate  DateTime? @map("last_reset_date")
+  
+  // Recovery tracking
+  recoveryUsedCount Int      @default(0) @map("recovery_used_count")
+  lastRecoveryDate  DateTime? @map("last_recovery_date")
+  
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  @@map("streaks")
+}
+
+model AIDecision {
+  id       String  @id @default(uuid())
+  userId   String  @map("user_id")
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId  String? @map("habit_id")
+  habit    Habit?  @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  
+  decisionType String @map("decision_type") // difficulty_adjust, burnout_detect, intervention
+  inputData    Json   @map("input_data")
+  aiResponse   Json   @map("ai_response")
+  explanation  String?
+  
+  // Cost Tracking
+  tokensUsed Int?     @map("tokens_used")
+  costUsd    Decimal? @map("cost_usd") @db.Decimal(10, 6)
+  modelUsed  String?  @map("model_used")
+  
+  // User Action
+  userAccepted Boolean? @map("user_accepted")
+  userOverride Json?    @map("user_override")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@index([userId, decisionType])
+  @@index([createdAt])
+  @@map("ai_decisions")
+}
+
+model BurnoutSignal {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId String? @map("habit_id")
+  habit   Habit?  @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  
+  detectedAt DateTime @default(now()) @map("detected_at")
+  severity   String // low, medium, high
+  
+  // Indicators
+  completionRateDrop    Decimal? @map("completion_rate_drop") @db.Decimal(5, 2)
+  consecutiveMisses     Int?     @map("consecutive_misses")
+  difficultyComplaints  Int?     @map("difficulty_complaints")
+  
+  // AI Analysis
+  aiAnalysis       Json? @map("ai_analysis")
+  suggestedActions Json? @map("suggested_actions")
+  
+  // Resolution
+  resolved   Boolean   @default(false)
+  resolvedAt DateTime? @map("resolved_at")
+  
+  @@index([userId, resolved])
+  @@map("burnout_signals")
+}
+
+model Notification {
+  id      String  @id @default(uuid())
+  userId  String  @map("user_id")
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId String? @map("habit_id")
+  habit   Habit?  @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  
+  type  String // reminder, encouragement, intervention, insight
+  title String
+  body  String
+  
+  scheduledFor DateTime @map("scheduled_for")
+  sentAt       DateTime? @map("sent_at")
+  
+  // Smart Timing
+  optimalTime   Boolean @default(false) @map("optimal_time")
+  contextAware  Boolean @default(false) @map("context_aware")
+  
+  status String @default("pending") // pending, sent, failed, cancelled
+  
+  @@index([userId, scheduledFor, status])
+  @@map("notifications")
+}
+
+model FeatureFlag {
+  id                String   @id @default(uuid())
+  flagKey           String   @unique @map("flag_key")
+  enabled           Boolean  @default(false)
+  rolloutPercentage Int      @default(0) @map("rollout_percentage") // 0-100
+  userWhitelist     Json?    @map("user_whitelist") // [user_id, ...]
+  metadata          Json?
+  
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  @@map("feature_flags")
+}
+
+model UserPreferences {
+  userId String @id @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Notifications
+  remindersEnabled Boolean @default(true) @map("reminders_enabled")
+  reminderTime     String  @default("09:00") @map("reminder_time")
+  quietHoursStart  String? @map("quiet_hours_start")
+  quietHoursEnd    String? @map("quiet_hours_end")
+  
+  // AI Behavior
+  aiSuggestionsEnabled      Boolean @default(true) @map("ai_suggestions_enabled")
+  autoAdjustDifficulty      Boolean @default(true) @map("auto_adjust_difficulty")
+  maxAiAdjustmentsPerWeek   Int     @default(2) @map("max_ai_adjustments_per_week")
+  
+  // Privacy
+  analyticsEnabled Boolean @default(true) @map("analytics_enabled")
+  
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  @@map("user_preferences")
+}
+
+model SyncMetadata {
+  id        String @id @default(uuid())
+  userId    String @map("user_id")
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  tableName String @map("table_name")
+  recordId  String @map("record_id")
+  
+  lastSyncedAt      DateTime? @map("last_synced_at")
+  clientVersion     Int?      @map("client_version")
+  serverVersion     Int?      @map("server_version")
+  
+  conflictResolution String? @map("conflict_resolution") // server_wins, client_wins, merged
+  
+  @@index([userId, tableName])
+  @@map("sync_metadata")
+}
