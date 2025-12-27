@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
-import prisma from './prisma';
-import { connection as redis } from './queue';
+import prisma from '../lib/prisma';
+import { connection as redis } from '../lib/queue';
 import type { GenerateInsightsResult } from '../types';
 
 const openai = new OpenAI({
