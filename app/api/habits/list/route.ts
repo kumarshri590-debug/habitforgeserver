@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     } catch (error: unknown) {
         console.error('Error fetching habits:', error);
         return NextResponse.json(
-            { error: 'Failed to fetch habits', details: error.message },
+            { error: 'Failed to fetch habits', details: error instanceof Error ? error.message : 'Unknown error' },
             { status: 500 }
         );
     }

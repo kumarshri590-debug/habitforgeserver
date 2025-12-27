@@ -106,7 +106,7 @@ Return JSON with this exact structure:
     } catch (error: unknown) {
         console.error('Error generating fallback:', error);
         return NextResponse.json(
-            { error: 'Failed to generate fallback habits', details: error.message },
+            { error: 'Failed to generate fallback habits', details: error instanceof Error ? error.message : 'Unknown error' },
             { status: 500 }
         );
     }

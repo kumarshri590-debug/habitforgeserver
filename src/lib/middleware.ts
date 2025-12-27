@@ -7,9 +7,9 @@ export interface AuthenticatedRequest extends NextRequest {
 }
 
 export function withAuth(
-    handler: (req: AuthenticatedRequest) => Promise<NextResponse>
+    handler: (req: AuthenticatedRequest, context?: any) => Promise<NextResponse>
 ) {
-    return async (req: NextRequest) => {
+    return async (req: NextRequest, context?: any) => {
         try {
             const authHeader = req.headers.get('authorization');
             const token = extractTokenFromHeader(authHeader);
@@ -28,7 +28,7 @@ export function withAuth(
             authenticatedReq.userId = payload.userId;
             authenticatedReq.email = payload.email;
 
-            return handler(authenticatedReq);
+            return handler(authenticatedReq, context);
         } catch (error) {
             return NextResponse.json(
                 { error: 'Invalid or expired token' },

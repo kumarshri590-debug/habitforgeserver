@@ -49,11 +49,11 @@ export async function createHabit(userId: string, data: z.infer<typeof createHab
             description: validated.description,
             category: validated.category,
             frequency: validated.frequency,
-            targetDays: validated.targetDays,
+            targetDays: validated.targetDays as any,
             timeOfDay: validated.timeOfDay,
             currentDifficulty: estimatedDifficulty,
             baseDifficulty: estimatedDifficulty,
-            microSteps,
+            microSteps: microSteps as any,
             aiRationale,
         },
     });

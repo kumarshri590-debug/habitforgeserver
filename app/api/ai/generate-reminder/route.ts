@@ -53,7 +53,7 @@ Return JSON with this exact structure:
     } catch (error: unknown) {
         console.error('Error generating reminder:', error);
         return NextResponse.json(
-            { error: 'Failed to generate reminder', details: error.message },
+            { error: 'Failed to generate reminder', details: error instanceof Error ? error.message : 'Unknown error' },
             { status: 500 }
         );
     }

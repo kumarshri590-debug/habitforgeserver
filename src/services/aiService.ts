@@ -144,8 +144,8 @@ async function logAIDecision(
     userId: string,
     habitId: string | null,
     decisionType: string,
-    inputData: Record<string, unknown>,
-    aiResponse: Record<string, unknown>,
+    inputData: any,
+    aiResponse: any,
     explanation: string | null,
     tokensUsed: number
 ) {

@@ -115,7 +115,7 @@ Return JSON with this exact structure:
     } catch (error: unknown) {
         console.error('Error adjusting difficulty:', error);
         return NextResponse.json(
-            { error: 'Failed to adjust difficulty', details: error.message },
+            { error: 'Failed to adjust difficulty', details: error instanceof Error ? error.message : 'Unknown error' },
             { status: 500 }
         );
     }
